@@ -1,0 +1,16 @@
+{
+  "name": "visualmind-server",
+  "version": "0.1.0",
+  "description": "Backend for VisualMind MVP",
+  "type": "module",
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js"
+  },
+  "dependencies": {
+    "express": "^4.18.2",
+    "multer": "^2.0.1",
+    "node-fetch": "^3.3.2",
+    "uuid": "^9.0.0"
+  }
+}
