@@ -35,3 +35,12 @@ npm run dev
 ```
 
 서버는 기본 3001번 포트에서 실행되고, 클라이언트 개발 서버는 5173번 포트에서 동작하며 API 요청은 프록시를 통해 서버로 전달됩니다.
+
+## 추가 API
+
+- `GET /api/health`: 서버 상태를 확인하는 헬스 체크 엔드포인트입니다.
+- `GET /api/maps`: 업로드하여 생성된 마인드맵 ID 목록을 반환합니다.
+- `GET /api/maps/:id`: 특정 ID의 마인드맵 JSON을 조회합니다.
+- `POST /api/maps/:id/add`: 지정한 경로에 자식 노드를 추가합니다. `path` 배열과 `title`을 JSON으로 전달합니다.
+- `POST /api/maps/:id/remove`: `path` 배열로 특정 노드를 삭제합니다.
+- `POST /api/maps/:id/expand`: `path`에 해당하는 노드를 LLM을 이용해 더 세부 구조로 확장합니다.
