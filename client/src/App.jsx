@@ -28,6 +28,7 @@ function MindMapNode({ node, path, onAdd, onDelete, onExpand }) {
 
 function App() {
   const [file, setFile] = useState(null);
+  const [text, setText] = useState('');
   const [tree, setTree] = useState(null);
   const [mapId, setMapId] = useState('');
   const [maps, setMaps] = useState([]);
@@ -48,13 +49,25 @@ function App() {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (!file) return;
-    const formData = new FormData();
-    formData.append('file', file);
     setLoading(true);
     setError('');
     try {
-      const res = await fetch('/api/upload', { method: 'POST', body: formData });
+      let res;
+      if (file) {
+        const formData = new FormData();
+        formData.append('file', file);
+        res = await fetch('/api/upload', { method: 'POST', body: formData });
+      } else if (text.trim()) {
+        res = await fetch('/api/text', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ text })
+        });
+      } else {
+        setError('No file or text provided');
+        setLoading(false);
+        return;
+      }
       if (!res.ok) throw new Error('Upload failed');
       const data = await res.json();
       setTree(data.tree);
@@ -111,8 +124,19 @@ function App() {
     <div style={{ padding: '2rem' }}>
       <h1>VisualMind MVP</h1>
       <form onSubmit={handleSubmit}>
-        <input type="file" onChange={e => setFile(e.target.files[0])} />
-        <button type="submit">Upload</button>
+        <div style={{ marginBottom: '0.5rem' }}>
+          <input type="file" onChange={e => setFile(e.target.files[0])} />
+        </div>
+        <div style={{ marginBottom: '0.5rem' }}>
+          <textarea
+            placeholder="또는 텍스트를 입력하세요"
+            rows="5"
+            style={{ width: '100%' }}
+            value={text}
+            onChange={e => setText(e.target.value)}
+          />
+        </div>
+        <button type="submit">Submit</button>
       </form>
       {loading && <p>Processing...</p>}
       {error && <p style={{ color: 'red' }}>{error}</p>}
