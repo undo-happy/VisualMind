@@ -2,6 +2,8 @@ import express from 'express';
 import multer from 'multer';
 import fetch from 'node-fetch';
 import fs from 'fs';
+import path from 'path';
+import { fileURLToPath } from 'url';
 import { v4 as uuidv4 } from 'uuid';
 
 const app = express();
@@ -9,6 +11,7 @@ app.use(express.json());
 const upload = multer({ dest: 'uploads/' });
 const PORT = process.env.PORT || 3001;
 const UPSTAGE_API_KEY = process.env.UPSTAGE_API_KEY;
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
 // 업로드된 마인드맵을 메모리에 저장하기 위한 간단한 배열
 const maps = [];
 
@@ -41,7 +44,7 @@ function addChildByPath(tree, path, child) {
 
 async function structuredOutput(text) {
   if (!UPSTAGE_API_KEY) {
-    throw new Error('UPSTAGE_API_KEY not configured');
+    return text;
   }
   const res = await fetch('https://api.upstage.ai/v1/structured-output', {
     method: 'POST',
@@ -63,7 +66,8 @@ async function structuredOutput(text) {
 
 async function parseDocument(filePath, mime) {
   if (!UPSTAGE_API_KEY) {
-    throw new Error('UPSTAGE_API_KEY not configured');
+    // API 키가 없으면 파일명을 이용한 더미 텍스트 반환
+    return `Content from ${path.basename(filePath)}`;
   }
   const endpoint = mime === 'application/pdf'
     ? 'https://api.upstage.ai/v1/document/parser'
@@ -89,6 +93,12 @@ async function parseDocument(filePath, mime) {
 }
 
 async function buildMindMap(text) {
+  if (!UPSTAGE_API_KEY) {
+    // 텍스트의 첫 문장을 루트로 하는 간단한 더미 트리 생성
+    const first = text.split(/\n+/)[0] || 'MindMap';
+    return { title: first, children: [] };
+  }
+
   const prompt = `너는 주어진 텍스트의 핵심 내용을 분석하여 마인드맵으로 정리하는 전문가야. 최대 2단계 깊이의 트리 구조를 JSON으로만 반환해줘.\n${text}`;
 
   const res = await fetch('https://api.upstage.ai/v1/solar/chat/completions', {
@@ -101,8 +111,8 @@ async function buildMindMap(text) {
   });
 
   if (!res.ok) {
-    const text = await res.text();
-    throw new Error(`Solar Pro request failed: ${text}`);
+    const body = await res.text();
+    throw new Error(`Solar Pro request failed: ${body}`);
   }
 
   const data = await res.json();
@@ -123,6 +133,24 @@ app.post('/api/upload', upload.single('file'), async (req, res) => {
     res.status(500).json({ error: err.message });
   } finally {
     fs.unlink(file.path, () => {});
+  }
+});
+
+// 텍스트 직접 입력 처리
+app.post('/api/text', async (req, res) => {
+  const { text } = req.body;
+  if (typeof text !== 'string' || !text.trim()) {
+    return res.status(400).json({ error: 'Text required' });
+  }
+  try {
+    const formatted = await structuredOutput(text);
+    const tree = await buildMindMap(formatted);
+    const id = uuidv4();
+    maps.push({ id, tree, text, formatted });
+    res.json({ tree, id });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: err.message });
   }
 });
 
@@ -187,6 +215,19 @@ app.post('/api/maps/:id/expand', async (req, res) => {
 app.get('/api/health', (req, res) => {
   res.json({ status: 'ok' });
 });
+
+// 정적 파일 제공 (빌드된 프런트엔드)
+const clientDist = path.join(__dirname, '..', 'client', 'dist');
+if (fs.existsSync(clientDist)) {
+  app.use(express.static(clientDist));
+  app.get('*', (req, res, next) => {
+    if (!req.path.startsWith('/api')) {
+      res.sendFile(path.join(clientDist, 'index.html'));
+    } else {
+      next();
+    }
+  });
+}
 
 app.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);
