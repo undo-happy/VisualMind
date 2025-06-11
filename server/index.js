@@ -126,6 +126,24 @@ app.post('/api/upload', upload.single('file'), async (req, res) => {
   }
 });
 
+// 텍스트 직접 입력 처리
+app.post('/api/text', async (req, res) => {
+  const { text } = req.body;
+  if (typeof text !== 'string' || !text.trim()) {
+    return res.status(400).json({ error: 'Text required' });
+  }
+  try {
+    const formatted = await structuredOutput(text);
+    const tree = await buildMindMap(formatted);
+    const id = uuidv4();
+    maps.push({ id, tree, text, formatted });
+    res.json({ tree, id });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // 저장된 마인드맵 목록 반환
 app.get('/api/maps', (req, res) => {
   res.json(maps.map(({ id }) => ({ id })));

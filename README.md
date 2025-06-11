@@ -1,6 +1,6 @@
 # VisualMind MVP
 
-VisualMind은 문서나 이미지로부터 자동으로 마인드맵을 생성하는 웹 애플리케이션입니다. React 기반 프런트엔드와 Node.js 백엔드로 구성되어 있으며, Upstage의 OCR/Parser와 Solar Pro LLM을 활용해 업로드된 파일을 분석하고 2단계 깊이의 트리 구조를 생성합니다.
+VisualMind은 문서나 이미지뿐 아니라 사용자가 직접 입력한 텍스트로부터도 자동으로 마인드맵을 생성하는 웹 애플리케이션입니다. React 기반 프런트엔드와 Node.js 백엔드로 구성되어 있으며, Upstage의 OCR/Parser와 Solar Pro LLM을 활용해 업로드된 파일이나 텍스트를 분석하고 2단계 깊이의 트리 구조를 생성합니다.
 
 ## 주요 구성 요소
 
@@ -41,6 +41,7 @@ npm run dev
 - `GET /api/health`: 서버 상태를 확인하는 헬스 체크 엔드포인트입니다.
 - `GET /api/maps`: 업로드하여 생성된 마인드맵 ID 목록을 반환합니다.
 - `GET /api/maps/:id`: 특정 ID의 마인드맵 JSON을 조회합니다.
+- `POST /api/text`: 텍스트를 직접 전달하여 마인드맵을 생성합니다. `{ text }`를 JSON으로 보냅니다.
 - `POST /api/maps/:id/add`: 지정한 경로에 자식 노드를 추가합니다. `path` 배열과 `title`을 JSON으로 전달합니다.
 - `POST /api/maps/:id/remove`: `path` 배열로 특정 노드를 삭제합니다.
 - `POST /api/maps/:id/expand`: `path`에 해당하는 노드를 LLM을 이용해 더 세부 구조로 확장합니다.
