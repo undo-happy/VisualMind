@@ -1,7 +1,8 @@
 {
   "name": "visualmind-root",
   "private": true,
+  "workspaces": ["server", "client"],
   "scripts": {
-    "test": "echo 'No tests specified'"
+    "test": "npm --workspace server test && npm --workspace client test"
   }
 }

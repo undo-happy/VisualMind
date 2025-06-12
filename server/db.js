@@ -3,7 +3,8 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const db = new Database(path.join(__dirname, 'visualmind.db'));
+const db = new Database(path.join(__dirname, 'visualmind.db'), { timeout: 5000 });
+db.pragma('journal_mode = WAL');
 
 // Initialize tables
 export function init() {
@@ -27,7 +28,8 @@ export function init() {
     path TEXT,
     stability REAL,
     difficulty REAL,
-    due TEXT
+    due TEXT,
+    UNIQUE(mapId, userId, path)
   )`);
 }
 
@@ -48,7 +50,11 @@ export const upsertQuotaStmt = db.prepare(`INSERT INTO usage_quota (userId, date
   ON CONFLICT(userId, date) DO UPDATE SET count = count + 1`);
 export const selectDueCardsStmt = db.prepare('SELECT mapId, path, due FROM fsrs WHERE userId = ? AND due <= ?');
 export const selectCardStmt = db.prepare('SELECT * FROM fsrs WHERE userId = ? AND mapId = ? AND path = ?');
-export const insertCardStmt = db.prepare('INSERT INTO fsrs (mapId, userId, path, stability, difficulty, due) VALUES (?, ?, ?, ?, ?, ?)');
+export const insertCardStmt = db.prepare(`
+  INSERT INTO fsrs (mapId, userId, path, stability, difficulty, due)
+  VALUES (?, ?, ?, ?, ?, ?)
+  ON CONFLICT(mapId, userId, path) DO NOTHING
+`);
 export const updateCardStmt = db.prepare('UPDATE fsrs SET stability = ?, difficulty = ?, due = ? WHERE id = ?');
 export const deleteCardsByMapStmt = db.prepare('DELETE FROM fsrs WHERE mapId = ? AND userId = ?');
 

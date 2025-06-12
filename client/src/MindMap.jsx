@@ -48,10 +48,10 @@ export default function MindMap({ data, layout = 'hierarchical', width = 600, he
     g.selectAll('*').remove();
     if (layoutData.nodes.length === 0) return;
 
-    let nodes = layoutData.nodes;
-    let links = layoutData.links;
-
-    if (layoutData.nodes.length > VIRTUAL_THRESHOLD) {
+    const { nodes, links } = React.useMemo(() => {
+      if (layoutData.nodes.length <= VIRTUAL_THRESHOLD) {
+        return { nodes: layoutData.nodes, links: layoutData.links };
+      }
       const minX = -transformState.x / transformState.k;
       const minY = -transformState.y / transformState.k;
       const maxX = (width - transformState.x) / transformState.k;
@@ -62,8 +62,8 @@ export default function MindMap({ data, layout = 'hierarchical', width = 600, he
         const y = layout === 'radial' ? n.y + height / 2 : n.y;
         return x >= minX - margin && x <= maxX + margin && y >= minY - margin && y <= maxY + margin;
       };
-      nodes = layoutData.nodes.filter(isVisible);
-      links = layoutData.links.filter(l => {
+      const filteredNodes = layoutData.nodes.filter(isVisible);
+      const filteredLinks = layoutData.links.filter(l => {
         const sx = layout === 'radial' ? l.source[0] + width / 2 : l.source[0];
         const sy = layout === 'radial' ? l.source[1] + height / 2 : l.source[1];
         const tx = layout === 'radial' ? l.target[0] + width / 2 : l.target[0];
@@ -73,7 +73,8 @@ export default function MindMap({ data, layout = 'hierarchical', width = 600, he
           (tx >= minX && tx <= maxX && ty >= minY && ty <= maxY)
         );
       });
-    }
+      return { nodes: filteredNodes, links: filteredLinks };
+    }, [layoutData, transformState, width, height, layout]);
 
     if (layout === 'radial') {
       const group = g.append('g').attr('transform', `translate(${width / 2},${height / 2})`);
@@ -177,8 +178,12 @@ export default function MindMap({ data, layout = 'hierarchical', width = 600, he
     const scale = miniW / width;
     const viewW = width / transformState.k * scale;
     const viewH = height / transformState.k * scale;
-    const viewX = -transformState.x / transformState.k * scale;
-    const viewY = -transformState.y / transformState.k * scale;
+    let viewX = -transformState.x / transformState.k * scale;
+    let viewY = -transformState.y / transformState.k * scale;
+    if (layout === 'radial') {
+      viewX -= (width / 2) / transformState.k * scale;
+      viewY -= (height / 2) / transformState.k * scale;
+    }
     miniSvg
       .append('rect')
       .attr('class', 'view-rect')

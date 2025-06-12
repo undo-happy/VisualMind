@@ -38,7 +38,7 @@ API 키는 `UPSTAGE_API_KEY` 환경 변수로 주입하며, 실 서비스에서�
 관리자 계정은 `ADMIN_UIDS` 환경 변수(콤마 구분 UID 목록)로 지정하여 역할 기반 접근 제어를 활성화할 수 있습니다.
 `S3_BUCKET`과 `AWS_REGION`을 지정하면 업로드된 원본 파일이 Amazon S3에 저장됩니다.
 로그 레벨은 `LOG_LEVEL` 환경 변수로 조정할 수 있습니다.
-`STRIPE_SECRET_KEY`와 `STRIPE_PRICE_ID`를 설정하면 구독 결제가 활성화됩니다.
+`STRIPE_SECRET_KEY`, `STRIPE_PRICE_ID`, `STRIPE_WEBHOOK_SECRET`을 설정하면 구독 결제가 활성화됩니다.
 `CLUSTER` 값을 지정하면 해당 수만큼 Node.js 워커 프로세스를 띄워 여러 CPU 코어를 활용할 수 있습니다.
 
 ## 실행 방법

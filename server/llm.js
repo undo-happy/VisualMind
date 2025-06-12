@@ -1,7 +1,7 @@
 import fetch from 'node-fetch';
 import fs from 'fs';
 import path from 'path';
-import { sha1 } from './utils.js';
+import { sha256 } from './utils.js';
 import NodeCache from 'node-cache';
 import clamav from 'clamav.js';
 import { S3Client, PutObjectCommand } from '@aws-sdk/client-s3';
@@ -12,9 +12,17 @@ const CLAMAV_HOST = process.env.CLAMAV_HOST;
 const CLAMAV_PORT = parseInt(process.env.CLAMAV_PORT || '3310', 10);
 const S3_BUCKET = process.env.S3_BUCKET;
 const AWS_REGION = process.env.AWS_REGION;
-
-const s3 = S3_BUCKET ? new S3Client({ region: AWS_REGION }) : null;
+if (S3_BUCKET && !AWS_REGION) {
+  throw new Error('AWS_REGION must be set when using S3_BUCKET');
+}
+const s3 = S3_BUCKET && AWS_REGION ? new S3Client({ region: AWS_REGION }) : null;
 const cache = new NodeCache({ stdTTL: 3600 });
+
+function fetchWithTimeout(url, options = {}, timeout = 30000) {
+  const controller = new AbortController();
+  const id = setTimeout(() => controller.abort(), timeout);
+  return fetch(url, { ...options, signal: controller.signal }).finally(() => clearTimeout(id));
+}
 
 export async function uploadToS3(file) {
   if (!s3) return null;
@@ -41,14 +49,14 @@ export async function scanFile(filePath) {
 }
 
 export async function structuredOutput(text) {
-  const key = `structured:${sha1(text)}`;
+  const key = `structured:${sha256(text)}`;
   const cached = cache.get(key);
   if (cached) return cached;
   if (!UPSTAGE_API_KEY) {
     cache.set(key, text);
     return text;
   }
-  const res = await fetch('https://api.upstage.ai/v1/structured-output', {
+  const res = await fetchWithTimeout('https://api.upstage.ai/v1/structured-output', {
     method: 'POST',
     headers: {
       'Authorization': `Bearer ${UPSTAGE_API_KEY}`,
@@ -68,7 +76,7 @@ export async function structuredOutput(text) {
 
 export async function parseDocument(filePath, mime) {
   const buffer = await fs.promises.readFile(filePath);
-  const key = `ocr:${sha1(buffer)}`;
+  const key = `ocr:${sha256(buffer)}`;
   const cached = cache.get(key);
   if (cached) return cached;
   if (!UPSTAGE_API_KEY) {
@@ -79,7 +87,7 @@ export async function parseDocument(filePath, mime) {
   const endpoint = mime === 'application/pdf'
     ? 'https://api.upstage.ai/v1/document/parser'
     : 'https://api.upstage.ai/v1/document/ocr';
-  const res = await fetch(endpoint, {
+  const res = await fetchWithTimeout(endpoint, {
     method: 'POST',
     headers: {
       'Authorization': `Bearer ${UPSTAGE_API_KEY}`,
@@ -98,7 +106,7 @@ export async function parseDocument(filePath, mime) {
 }
 
 export async function buildMindMap(text) {
-  const key = `mindmap:${sha1(text)}`;
+  const key = `mindmap:${sha256(text)}`;
   const cached = cache.get(key);
   if (cached) return cached;
   if (!UPSTAGE_API_KEY) {
@@ -108,7 +116,7 @@ export async function buildMindMap(text) {
     return dummy;
   }
   const prompt = `너는 주어진 텍스트의 핵심 내용을 분석하여 마인드맵으로 정리하는 전문가야. 최대 2단계 깊이의 트리 구조를 JSON으로만 반환해줘.\n${text}`;
-  const res = await fetch('https://api.upstage.ai/v1/solar/chat/completions', {
+  const res = await fetchWithTimeout('https://api.upstage.ai/v1/solar/chat/completions', {
     method: 'POST',
     headers: {
       'Authorization': `Bearer ${UPSTAGE_API_KEY}`,

@@ -33,6 +33,7 @@ import {
   schedule,
   updateCard
 } from './fsrs.js';
+import { deleteCardsByMapStmt } from './db.js';
 import {
   uploadToS3,
   parseDocument,
@@ -58,6 +59,7 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const PORT = process.env.PORT || 3001;
 const STRIPE_SECRET_KEY = process.env.STRIPE_SECRET_KEY;
 const STRIPE_PRICE_ID = process.env.STRIPE_PRICE_ID;
+const STRIPE_WEBHOOK_SECRET = process.env.STRIPE_WEBHOOK_SECRET;
 
 const upload = multer({ dest: 'uploads/' });
 const stripe = STRIPE_SECRET_KEY ? new Stripe(STRIPE_SECRET_KEY) : null;
@@ -65,6 +67,21 @@ const logger = pino({ level: process.env.LOG_LEVEL || 'info' });
 client.collectDefaultMetrics();
 
 const app = express();
+app.post('/api/stripe/webhook', express.raw({ type: 'application/json' }), (req, res) => {
+  if (!stripe || !STRIPE_WEBHOOK_SECRET) {
+    return res.status(500).json({ error: 'Billing not configured' });
+  }
+  const sig = req.headers['stripe-signature'];
+  let event;
+  try {
+    event = stripe.webhooks.constructEvent(req.body, sig, STRIPE_WEBHOOK_SECRET);
+  } catch (err) {
+    logger.error('Webhook signature verification failed', err);
+    return res.status(400).send(`Webhook Error: ${err.message}`);
+  }
+  logger.info('Stripe webhook received', event.type);
+  res.json({ received: true });
+});
 app.use(express.json());
 app.use(pinoHttp({ logger }));
 app.use('/api', limiter);
@@ -187,8 +204,8 @@ app.post('/api/text-sse', checkQuota, async (req, res) => {
 
 app.get('/api/maps', (req, res) => {
   const userId = req.user ? req.user.uid : 'anonymous';
-  const limit = req.query.limit ? Math.min(parseInt(req.query.limit, 10), 50) : null;
-  const offset = req.query.offset ? parseInt(req.query.offset, 10) : 0;
+  const limit = Number.isInteger(+req.query.limit) ? Math.min(+req.query.limit, 50) : null;
+  const offset = Number.isInteger(+req.query.offset) ? +req.query.offset : 0;
   let rows;
   if (limit) {
     rows = selectMapsPagedStmt.all(userId, limit, offset);
@@ -221,7 +238,7 @@ app.delete('/api/maps/:id', (req, res) => {
   } else {
     deleteMapStmt.run(req.params.id, userId);
   }
-  rebuildFsrs(req.params.id, userId, map.tree);
+  deleteCardsByMapStmt.run(req.params.id, userId);
   res.json({ success: true });
 });
 
@@ -342,10 +359,6 @@ app.post('/api/create-checkout-session', async (req, res) => {
   }
 });
 
-app.post('/api/stripe/webhook', (req, res) => {
-  logger.info('Stripe webhook received', req.body.type);
-  res.json({ received: true });
-});
 
 app.get('/api/health', (req, res) => {
   res.json({ status: 'ok' });

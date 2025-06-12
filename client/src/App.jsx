@@ -224,13 +224,18 @@ function App() {
           const { value, done } = await reader.read();
           if (done) break;
           buffer += decoder.decode(value, { stream: true });
-          const parts = buffer.split('\n\n');
-          buffer = parts.pop();
-          for (const part of parts) {
-            const lines = part.split('\n');
-            const event = lines[0].replace('event: ', '').trim();
-            const dataStr = lines[1].replace('data: ', '').trim();
-            if (event === 'tree') {
+          let idx;
+          while ((idx = buffer.indexOf('\n\n')) !== -1) {
+            const chunk = buffer.slice(0, idx);
+            buffer = buffer.slice(idx + 2);
+            const lines = chunk.split('\n');
+            const evt = { event: 'message', data: '' };
+            for (const line of lines) {
+              if (line.startsWith('event:')) evt.event = line.slice(6).trim();
+              if (line.startsWith('data:')) evt.data += line.slice(5) + '\n';
+            }
+            const dataStr = evt.data.trim();
+            if (evt.event === 'tree') {
               const data = JSON.parse(dataStr);
               setTree(data.tree);
               setMapId(data.id);

@@ -15,7 +15,10 @@ export function requireAdmin(req, res, next) {
 }
 
 export async function verifyAuth(req, res, next) {
-  if (!admin.apps.length) return next();
+  if (!admin.apps.length) {
+    console.error('Firebase Admin not initialised – blocking request');
+    return res.status(500).json({ error: 'Server misconfiguration' });
+  }
   if (req.path === '/health') return next();
   const authHeader = req.headers.authorization || '';
   const token = authHeader.startsWith('Bearer ') ? authHeader.split(' ')[1] : null;
