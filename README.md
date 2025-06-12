@@ -6,6 +6,18 @@ VisualMind은 문서나 이미지뿐 아니라 사용자가 직접 입력한 텍
 
 - **client**: Vite + React 로 작성된 프런트엔드. 사용자가 파일을 업로드하면 서버에 전달하고, 생성된 마인드맵 JSON을 화면에 표시합니다.
 - 오프라인 사용을 위한 PWA 서비스 워커와 매니페스트를 제공합니다.
+- 라이트/다크 모드를 전환할 수 있는 테마 토글을 제공합니다.
+- 반응형 레이아웃과 부드러운 테마 전환 애니메이션을 적용했습니다.
+- 언어 전환 토글과 ARIA 레이블을 통해 접근성을 개선했습니다.
+- 방사형과 계층형 레이아웃을 전환할 수 있는 레이아웃 토글을 제공합니다.
+- 마인드맵을 드래그 및 스크롤로 이동하고 확대/축소할 수 있으며, 우측 하단에 미니맵이 표시됩니다.
+- 대규모 트리 렌더링을 위해 레이아웃 계산을 Web Worker에서 수행합니다.
+- 노드 수가 많은 경우 화면에 보이는 부분만 SVG로 그려 성능을 높입니다.
+- 저장된 맵 목록은 페이징 API를 통해 단계적으로 로드됩니다.
+- Stripe 결제를 통한 유료 구독 기능을 제공합니다.
+- 텍스트 입력 시 SSE 스트림을 통해 실시간으로 진행 상황을 확인할 수 있습니다.
+- Web Vitals 지표를 수집하여 `/api/metrics`에서 Prometheus 형식으로 노출합니다.
+- 노드별 FSRS(Free Spaced Repetition Scheduler) 복습 주기를 계산하여 학습 기능을 제공합니다.
 - **server**: Express 기반 백엔드. 파일 업로드를 처리하고 Upstage API를 호출해 텍스트를 추출한 후 Solar Pro LLM으로 마인드맵 구조를 생성합니다.
 
 ## 동작 흐름
@@ -26,6 +38,9 @@ API 키는 `UPSTAGE_API_KEY` 환경 변수로 주입하며, 실 서비스에서�
 관리자 계정은 `ADMIN_UIDS` 환경 변수(콤마 구분 UID 목록)로 지정하여 역할 기반 접근 제어를 활성화할 수 있습니다.
 `S3_BUCKET`과 `AWS_REGION`을 지정하면 업로드된 원본 파일이 Amazon S3에 저장됩니다.
 로그 레벨은 `LOG_LEVEL` 환경 변수로 조정할 수 있습니다.
+`STRIPE_SECRET_KEY`, `STRIPE_PRICE_ID`, `STRIPE_WEBHOOK_SECRET`을 설정하면 구독 결제가 활성화됩니다.
+`CLUSTER` 값을 지정하면 해당 수만큼 Node.js 워커 프로세스를 띄워 여러 CPU 코어를 활용할 수 있습니다.
+`REDIS_URL`을 지정하면 BullMQ 작업 큐와 캐시 저장소로 Redis를 사용합니다.
 
 ## 실행 방법
 
@@ -33,6 +48,8 @@ API 키는 `UPSTAGE_API_KEY` 환경 변수로 주입하며, 실 서비스에서�
 # 서버
 cd server && npm install
 npm start
+# 작업 큐 워커 (옵션)
+npm run worker
 
 # 클라이언트 (개발용)
 cd ../client && npm install
@@ -66,13 +83,20 @@ cd ../client && npm run build
 ## 추가 API
 - `POST /api/upload`: 파일을 업로드하여 마인드맵을 생성합니다. `file` 필드를 multipart 형식으로 전송합니다.
 
-- `GET /api/health`: 서버 상태를 확인하는 헬스 체크 엔드포인트입니다.
+- `GET /api/health`: 서버 상태를 확인하는 헬스 체크 엔드포인트입니다. 로드 밸런서에서 주기적으로 호출해 프로세스 생존 여부를 점검할 수 있습니다.
 - `GET /api/usage`: 오늘 사용량과 할당량을 반환합니다.
-- `GET /api/maps`: 업로드하여 생성된 마인드맵 ID 목록을 반환합니다.
+- `POST /api/create-checkout-session`: Stripe 구독 결제 세션을 생성합니다.
+- `POST /api/stripe/webhook`: Stripe 웹훅 이벤트를 처리합니다.
+- `GET /api/maps`: 업로드하여 생성된 마인드맵 ID 목록을 반환합니다. `limit`과 `offset` 쿼리로 페이지네이션할 수 있습니다.
 - `GET /api/maps/:id`: 특정 ID의 마인드맵 JSON을 조회합니다.
 - `DELETE /api/maps/:id`: 지정한 마인드맵을 삭제합니다.
 - `GET /api/admin/maps`: 관리자 전용, 모든 사용자의 마인드맵 ID와 소유자를 조회합니다.
 - `POST /api/text`: 텍스트를 직접 전달하여 마인드맵을 생성합니다. `{ text }`를 JSON으로 보냅니다.
+- `POST /api/text-sse`: 텍스트 입력을 실시간으로 처리하여 SSE 스트림으로 진행 상황과 결과를 반환합니다.
 - `POST /api/maps/:id/add`: 지정한 경로에 자식 노드를 추가합니다. `path` 배열과 `title`을 JSON으로 전달합니다.
 - `POST /api/maps/:id/remove`: `path` 배열로 특정 노드를 삭제합니다.
 - `POST /api/maps/:id/expand`: `path`에 해당하는 노드를 LLM을 이용해 더 세부 구조로 확장합니다.
+- `GET /api/metrics`: Prometheus 형식의 서버 메트릭을 반환합니다.
+- `POST /api/rum`: 브라우저 Web Vitals 지표를 수집합니다.
+- `GET /api/review`: 오늘 복습이 필요한 노드 목록을 반환합니다.
+- `POST /api/review`: 노드 복습 결과를 기록하여 다음 복습 날짜를 계산합니다.

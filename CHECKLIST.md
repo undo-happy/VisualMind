@@ -12,24 +12,24 @@ This repository currently implements only basic MVP features. To prepare for pro
 - [x] Role based access control
 - [x] Structured logging and monitoring (basic request logs only)
 - [x] CI/CD automation
-- [ ] Billing and subscription management
+- [x] Billing and subscription management
 
 ## Mindmap Engine & UX Enhancements
 These tasks are derived from the detailed technical proposal and will guide further development.
 
-- [ ] Virtualized rendering for large trees (SVG/Canvas hybrid)
-- [ ] Incremental layout calculation and partial updates
-- [ ] Lazy loading APIs and client-side data fetching
-- [ ] Queue based OCR/LLM processing with BullMQ workers
+- [x] Virtualized rendering for large trees (SVG/Canvas hybrid)
+ - [x] Incremental layout calculation and partial updates
+- [x] Lazy loading APIs and client-side data fetching
+ - [x] Queue based OCR/LLM processing with BullMQ workers
 - [ ] Presigned URL uploads with file type and virus scanning
-- [ ] Node.js clustering and horizontal scaling
-- [ ] FSRS spaced repetition integration for nodes
-- [ ] Responsive UI themes and smooth animations
-- [ ] Radial and hierarchical layout modes (Reingold-Tilford)
-- [ ] Web Worker/offscreen canvas for heavy layout work
-- [ ] Pan/zoom controls with minimap and GPU transforms
-- [ ] Theme customization via CSS variables (dark/light)
-- [ ] Accessibility (ARIA labels, keyboard nav) and i18n
+- [x] Node.js clustering and horizontal scaling
+- [x] FSRS spaced repetition integration for nodes
+- [x] Responsive UI themes and smooth animations
+- [x] Radial and hierarchical layout modes (Reingold-Tilford)
+- [x] Web Worker/offscreen canvas for heavy layout work
+- [x] Pan/zoom controls with minimap and GPU transforms
+- [x] Theme customization via CSS variables (dark/light)
+- [x] Accessibility (ARIA labels, keyboard nav) and i18n
 - [x] PWA build with offline support
 
 ## Backend & Infrastructure
@@ -37,7 +37,7 @@ Expanded tasks for a scalable architecture.
 
 - [ ] Migrate database to PostgreSQL with adjacency list schema
 - [ ] Stateless JWT sessions and API gateway readiness
-- [ ] Redis caching layer and BullMQ job monitoring
-- [ ] Load balancing setup and health checks
-- [ ] Real-time streaming of LLM output via SSE/WebSockets
-- [ ] Application performance monitoring and RUM metrics
+ - [x] Redis caching layer and BullMQ job monitoring
+- [x] Load balancing setup and health checks
+- [x] Real-time streaming of LLM output via SSE/WebSockets
+- [x] Application performance monitoring and RUM metrics
