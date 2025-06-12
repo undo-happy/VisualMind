@@ -9,7 +9,9 @@ import admin from 'firebase-admin';
 import Database from 'better-sqlite3';
 import rateLimit from 'express-rate-limit';
 import NodeCache from 'node-cache';
-import morgan from 'morgan';
+import pino from 'pino';
+import pinoHttp from 'pino-http';
+import { S3Client, PutObjectCommand } from '@aws-sdk/client-s3';
 import crypto from 'crypto';
 import clamav from 'clamav.js';
 
@@ -17,7 +19,8 @@ const ADMIN_UIDS = process.env.ADMIN_UIDS ? process.env.ADMIN_UIDS.split(',') : 
 
 const app = express();
 app.use(express.json());
-app.use(morgan('combined'));
+const logger = pino({ level: process.env.LOG_LEVEL || 'info' });
+app.use(pinoHttp({ logger }));
 const limiter = rateLimit({ windowMs: 15 * 60 * 1000, max: 100 });
 app.use('/api', limiter);
 const cache = new NodeCache({ stdTTL: 3600 });
@@ -27,7 +30,10 @@ const UPSTAGE_API_KEY = process.env.UPSTAGE_API_KEY;
 const FIREBASE_SERVICE_ACCOUNT = process.env.FIREBASE_SERVICE_ACCOUNT;
 const CLAMAV_HOST = process.env.CLAMAV_HOST;
 const CLAMAV_PORT = parseInt(process.env.CLAMAV_PORT || '3310', 10);
+const S3_BUCKET = process.env.S3_BUCKET;
+const AWS_REGION = process.env.AWS_REGION;
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
+const s3 = S3_BUCKET ? new S3Client({ region: AWS_REGION }) : null;
 // SQLite database initialization
 const db = new Database(path.join(__dirname, 'visualmind.db'));
 db.exec(`CREATE TABLE IF NOT EXISTS maps (
@@ -70,6 +76,19 @@ function requireAdmin(req, res, next) {
     return res.status(403).json({ error: 'Forbidden' });
   }
   next();
+}
+
+async function uploadToS3(file) {
+  if (!s3) return null;
+  const key = `${uuidv4()}-${file.originalname}`;
+  const fileStream = fs.createReadStream(file.path);
+  await s3.send(new PutObjectCommand({
+    Bucket: S3_BUCKET,
+    Key: key,
+    Body: fileStream,
+    ContentType: file.mimetype
+  }));
+  return key;
 }
 
 function getMapFromDB(id, userId, admin = false) {
@@ -254,15 +273,16 @@ app.post('/api/upload', upload.single('file'), checkQuota, async (req, res) => {
   const { file } = req;
   try {
     await scanFile(file.path);
+    const fileKey = await uploadToS3(file);
     const text = await parseDocument(file.path, file.mimetype);
     const formatted = await structuredOutput(text);
     const tree = await buildMindMap(formatted);
     const id = uuidv4();
     const userId = req.user ? req.user.uid : 'anonymous';
     insertMapStmt.run(id, userId, JSON.stringify(tree), text, formatted);
-    res.json({ tree, id });
+    res.json({ tree, id, fileKey });
   } catch (err) {
-    console.error(err);
+    logger.error(err);
     res.status(500).json({ error: err.message });
   } finally {
     fs.unlink(file.path, () => {});
@@ -283,7 +303,7 @@ app.post('/api/text', checkQuota, async (req, res) => {
     insertMapStmt.run(id, userId, JSON.stringify(tree), text, formatted);
     res.json({ tree, id });
   } catch (err) {
-    console.error(err);
+    logger.error(err);
     res.status(500).json({ error: err.message });
   }
 });
@@ -385,7 +405,7 @@ app.post('/api/maps/:id/expand', checkQuota, async (req, res) => {
     }
     res.json(map.tree);
   } catch (err) {
-    console.error(err);
+    logger.error(err);
     res.status(500).json({ error: err.message });
   }
 });
@@ -418,5 +438,5 @@ if (fs.existsSync(clientDist)) {
 }
 
 app.listen(PORT, () => {
-  console.log(`Server running on port ${PORT}`);
+  logger.info(`Server running on port ${PORT}`);
 });
