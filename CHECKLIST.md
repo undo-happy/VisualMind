@@ -18,9 +18,9 @@ This repository currently implements only basic MVP features. To prepare for pro
 These tasks are derived from the detailed technical proposal and will guide further development.
 
 - [x] Virtualized rendering for large trees (SVG/Canvas hybrid)
-- [ ] Incremental layout calculation and partial updates
+ - [x] Incremental layout calculation and partial updates
 - [x] Lazy loading APIs and client-side data fetching
-- [ ] Queue based OCR/LLM processing with BullMQ workers
+ - [x] Queue based OCR/LLM processing with BullMQ workers
 - [ ] Presigned URL uploads with file type and virus scanning
 - [x] Node.js clustering and horizontal scaling
 - [x] FSRS spaced repetition integration for nodes
@@ -37,7 +37,7 @@ Expanded tasks for a scalable architecture.
 
 - [ ] Migrate database to PostgreSQL with adjacency list schema
 - [ ] Stateless JWT sessions and API gateway readiness
-- [ ] Redis caching layer and BullMQ job monitoring
+ - [x] Redis caching layer and BullMQ job monitoring
 - [x] Load balancing setup and health checks
 - [x] Real-time streaming of LLM output via SSE/WebSockets
 - [x] Application performance monitoring and RUM metrics

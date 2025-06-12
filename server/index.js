@@ -11,6 +11,7 @@ import Stripe from 'stripe';
 import pino from 'pino';
 import pinoHttp from 'pino-http';
 import client from 'prom-client';
+import { processQueue, queueEvents } from './queue.js';
 
 import {
   insertMapStmt,
@@ -154,13 +155,19 @@ app.post('/api/text', checkQuota, async (req, res) => {
     return res.status(400).json({ error: 'Text required' });
   }
   try {
-    const formatted = await structuredOutput(text);
-    const tree = await buildMindMap(formatted);
-    const id = uuidv4();
     const userId = req.user ? req.user.uid : 'anonymous';
-    insertMapStmt.run(id, userId, JSON.stringify(tree), text, formatted);
-    addFsrsForTree(id, userId, tree);
-    res.json({ tree, id });
+    if (processQueue) {
+      const job = await processQueue.add('text', { text, userId });
+      const { id, tree } = await job.waitUntilFinished(queueEvents);
+      res.json({ tree, id });
+    } else {
+      const formatted = await structuredOutput(text);
+      const tree = await buildMindMap(formatted);
+      const id = uuidv4();
+      insertMapStmt.run(id, userId, JSON.stringify(tree), text, formatted);
+      addFsrsForTree(id, userId, tree);
+      res.json({ tree, id });
+    }
   } catch (err) {
     logger.error(err);
     res.status(500).json({ error: err.message });
@@ -185,15 +192,22 @@ app.post('/api/text-sse', checkQuota, async (req, res) => {
   }
 
   try {
-    const formatted = await structuredOutput(text);
-    send('formatted', { formatted });
-    const tree = await buildMindMap(formatted);
-    const id = uuidv4();
     const userId = req.user ? req.user.uid : 'anonymous';
-    insertMapStmt.run(id, userId, JSON.stringify(tree), text, formatted);
-    addFsrsForTree(id, userId, tree);
-    send('tree', { tree, id });
-    send('end', 'done');
+    if (processQueue) {
+      const job = await processQueue.add('text', { text, userId });
+      const { id, tree } = await job.waitUntilFinished(queueEvents);
+      send('tree', { tree, id });
+      send('end', 'done');
+    } else {
+      const formatted = await structuredOutput(text);
+      send('formatted', { formatted });
+      const tree = await buildMindMap(formatted);
+      const id = uuidv4();
+      insertMapStmt.run(id, userId, JSON.stringify(tree), text, formatted);
+      addFsrsForTree(id, userId, tree);
+      send('tree', { tree, id });
+      send('end', 'done');
+    }
   } catch (err) {
     logger.error(err);
     send('error', err.message);
