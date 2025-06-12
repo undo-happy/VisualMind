@@ -21,6 +21,8 @@ VisualMind은 문서나 이미지뿐 아니라 사용자가 직접 입력한 텍
 6. 결과 JSON을 프런트엔드로 반환하여 화면에 표시하거나 저장에 활용할 수 있습니다.
 
 API 키는 `UPSTAGE_API_KEY` 환경 변수로 주입하며, 실 서비스에서는 GitHub Actions 등에서 비밀 값으로 관리합니다.
+바이러스 검사를 위해 `CLAMAV_HOST`와 `CLAMAV_PORT` 환경 변수를 설정하면 업로드된 파일을 ClamAV 서버로 스캔합니다.
+관리자 계정은 `ADMIN_UIDS` 환경 변수(콤마 구분 UID 목록)로 지정하여 역할 기반 접근 제어를 활성화할 수 있습니다.
 
 ## 실행 방법
 
@@ -41,10 +43,14 @@ cd ../client && npm run build
 서버는 기본 3001번 포트에서 실행되고, 클라이언트 개발 서버는 5173번 포트에서 동작하며 API 요청은 프록시를 통해 서버로 전달됩니다.
 
 ## 추가 API
+- `POST /api/upload`: 파일을 업로드하여 마인드맵을 생성합니다. `file` 필드를 multipart 형식으로 전송합니다.
 
 - `GET /api/health`: 서버 상태를 확인하는 헬스 체크 엔드포인트입니다.
+- `GET /api/usage`: 오늘 사용량과 할당량을 반환합니다.
 - `GET /api/maps`: 업로드하여 생성된 마인드맵 ID 목록을 반환합니다.
 - `GET /api/maps/:id`: 특정 ID의 마인드맵 JSON을 조회합니다.
+- `DELETE /api/maps/:id`: 지정한 마인드맵을 삭제합니다.
+- `GET /api/admin/maps`: 관리자 전용, 모든 사용자의 마인드맵 ID와 소유자를 조회합니다.
 - `POST /api/text`: 텍스트를 직접 전달하여 마인드맵을 생성합니다. `{ text }`를 JSON으로 보냅니다.
 - `POST /api/maps/:id/add`: 지정한 경로에 자식 노드를 추가합니다. `path` 배열과 `title`을 JSON으로 전달합니다.
 - `POST /api/maps/:id/remove`: `path` 배열로 특정 노드를 삭제합니다.
