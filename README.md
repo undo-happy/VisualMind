@@ -49,15 +49,15 @@ cd ../client && npm run build
 ## Vercel 배포 시 주의
 
 이 저장소는 `client`와 `server` 하위 폴더로 구성된 모노레포입니다. Vercel에서
-프런트엔드만 배포하려면 프로젝트 루트를 `client` 폴더로 지정해야 합니다.
-레포지토리 루트에 다음과 같은 `vercel.json` 파일을 추가한 후 배포하면 자동으로
-`npm install`과 `npm run build`가 실행됩니다.
+프런트엔드만 배포하려면 빌드 과정을 `client` 폴더에서 실행하도록 설정해야
+합니다. 레포지토리 루트에 다음과 같은 `vercel.json` 파일을 추가하면 의존성
+설치와 빌드가 `client` 폴더에서 수행됩니다.
 
 ```json
 {
-  "rootDirectory": "client",
-  "buildCommand": "npm run build",
-  "outputDirectory": "dist"
+  "installCommand": "npm install --prefix client",
+  "buildCommand": "npm run build --prefix client",
+  "outputDirectory": "client/dist"
 }
 ```
 
