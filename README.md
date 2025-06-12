@@ -46,6 +46,21 @@ cd ../client && npm run build
 최근 방문한 페이지를 다시 불러올 수 있습니다.
 ```
 
+## Vercel 배포 시 주의
+
+이 저장소는 `client`와 `server` 하위 폴더로 구성된 모노레포입니다. Vercel에서
+프런트엔드만 배포하려면 빌드 과정을 `client` 폴더에서 실행하도록 설정해야
+합니다. 레포지토리 루트에 다음과 같은 `vercel.json` 파일을 추가하면 의존성
+설치와 빌드가 `client` 폴더에서 수행됩니다.
+
+```json
+{
+  "installCommand": "npm install --prefix client",
+  "buildCommand": "npm run build --prefix client",
+  "outputDirectory": "client/dist"
+}
+```
+
 서버는 기본 3001번 포트에서 실행되고, 클라이언트 개발 서버는 5173번 포트에서 동작하며 API 요청은 프록시를 통해 서버로 전달됩니다.
 
 ## 추가 API
