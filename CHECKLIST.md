@@ -4,14 +4,14 @@ This repository currently implements only basic MVP features. To prepare for pro
 
 - [x] Firebase based user authentication
 - [x] Persistent database for maps and users
-- [ ] Cloud file storage (e.g. S3 or Firebase Storage)
+- [x] Cloud file storage (e.g. S3 or Firebase Storage)
 - [x] Rate limiting
 - [x] Usage quota per user
 - [x] Caching of LLM/OCR results
 - [x] Virus scanning for uploaded files
 - [x] Role based access control
-- [ ] Structured logging and monitoring (basic request logs only)
-- [ ] CI/CD automation
+- [x] Structured logging and monitoring (basic request logs only)
+- [x] CI/CD automation
 - [ ] Billing and subscription management
 
 ## Mindmap Engine & UX Enhancements
@@ -30,7 +30,7 @@ These tasks are derived from the detailed technical proposal and will guide furt
 - [ ] Pan/zoom controls with minimap and GPU transforms
 - [ ] Theme customization via CSS variables (dark/light)
 - [ ] Accessibility (ARIA labels, keyboard nav) and i18n
-- [ ] PWA build with offline support
+- [x] PWA build with offline support
 
 ## Backend & Infrastructure
 Expanded tasks for a scalable architecture.

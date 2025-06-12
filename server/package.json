@@ -16,7 +16,9 @@
     "better-sqlite3": "^9.1.0",
     "express-rate-limit": "^6.7.0",
     "node-cache": "^5.1.2",
-    "morgan": "^1.10.0",
-    "clamav.js": "^0.12.0"
+    "clamav.js": "^0.12.0",
+    "pino": "^8.15.0",
+    "pino-http": "^8.2.0",
+    "@aws-sdk/client-s3": "^3.828.0"
   }
 }
