@@ -1,4 +1,6 @@
 import React, { useState, useEffect } from 'react';
+import { auth } from './firebase';
+import { onAuthStateChanged, signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut } from 'firebase/auth';
 
 function MindMapNode({ node, path, onAdd, onDelete, onExpand }) {
   const label = node.title || node.name || node.key || 'Node';
@@ -27,6 +29,7 @@ function MindMapNode({ node, path, onAdd, onDelete, onExpand }) {
 }
 
 function App() {
+  const [user, setUser] = useState(null);
   const [file, setFile] = useState(null);
   const [text, setText] = useState('');
   const [tree, setTree] = useState(null);
@@ -34,9 +37,42 @@ function App() {
   const [maps, setMaps] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+
+  useEffect(() => {
+    const unsub = onAuthStateChanged(auth, u => setUser(u));
+    return () => unsub();
+  }, []);
+
+  const login = async e => {
+    e.preventDefault();
+    setError('');
+    try {
+      await signInWithEmailAndPassword(auth, email, password);
+    } catch (err) {
+      setError(err.message);
+    }
+  };
+
+  const signup = async e => {
+    e.preventDefault();
+    setError('');
+    try {
+      await createUserWithEmailAndPassword(auth, email, password);
+    } catch (err) {
+      setError(err.message);
+    }
+  };
+
+  const logout = () => {
+    signOut(auth);
+  };
 
   const loadMaps = async () => {
-    const res = await fetch('/api/maps');
+    const token = await auth.currentUser?.getIdToken?.();
+    const headers = token ? { Authorization: `Bearer ${token}` } : {};
+    const res = await fetch('/api/maps', { headers });
     if (res.ok) {
       const data = await res.json();
       setMaps(data);
@@ -52,15 +88,17 @@ function App() {
     setLoading(true);
     setError('');
     try {
+      const token = await auth.currentUser?.getIdToken?.();
+      const authHeader = token ? { Authorization: `Bearer ${token}` } : {};
       let res;
       if (file) {
         const formData = new FormData();
         formData.append('file', file);
-        res = await fetch('/api/upload', { method: 'POST', body: formData });
+        res = await fetch('/api/upload', { method: 'POST', headers: authHeader, body: formData });
       } else if (text.trim()) {
         res = await fetch('/api/text', {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: { 'Content-Type': 'application/json', ...authHeader },
           body: JSON.stringify({ text })
         });
       } else {
@@ -83,9 +121,12 @@ function App() {
   const addChild = async path => {
     const title = prompt('Child title');
     if (!title || !mapId) return;
+    const token = await auth.currentUser?.getIdToken?.();
+    const headers = { 'Content-Type': 'application/json' };
+    if (token) headers.Authorization = `Bearer ${token}`;
     const res = await fetch(`/api/maps/${mapId}/add`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers,
       body: JSON.stringify({ path, title })
     });
     if (res.ok) {
@@ -96,9 +137,12 @@ function App() {
 
   const deleteNode = async path => {
     if (!mapId || !confirm('Delete node?')) return;
+    const token = await auth.currentUser?.getIdToken?.();
+    const headers = { 'Content-Type': 'application/json' };
+    if (token) headers.Authorization = `Bearer ${token}`;
     const res = await fetch(`/api/maps/${mapId}/remove`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers,
       body: JSON.stringify({ path })
     });
     if (res.ok) {
@@ -109,9 +153,12 @@ function App() {
 
   const expandNode = async path => {
     if (!mapId) return;
+    const token = await auth.currentUser?.getIdToken?.();
+    const headers = { 'Content-Type': 'application/json' };
+    if (token) headers.Authorization = `Bearer ${token}`;
     const res = await fetch(`/api/maps/${mapId}/expand`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers,
       body: JSON.stringify({ path })
     });
     if (res.ok) {
@@ -123,21 +170,48 @@ function App() {
   return (
     <div style={{ padding: '2rem' }}>
       <h1>VisualMind MVP</h1>
-      <form onSubmit={handleSubmit}>
-        <div style={{ marginBottom: '0.5rem' }}>
-          <input type="file" onChange={e => setFile(e.target.files[0])} />
-        </div>
-        <div style={{ marginBottom: '0.5rem' }}>
-          <textarea
-            placeholder="또는 텍스트를 입력하세요"
-            rows="5"
-            style={{ width: '100%' }}
-            value={text}
-            onChange={e => setText(e.target.value)}
-          />
-        </div>
-        <button type="submit">Submit</button>
-      </form>
+      {user ? (
+        <>
+          <p>Logged in as {user.email}</p>
+          <button onClick={logout}>Logout</button>
+          <form onSubmit={handleSubmit} style={{ marginTop: '1rem' }}>
+            <div style={{ marginBottom: '0.5rem' }}>
+              <input type="file" onChange={e => setFile(e.target.files[0])} />
+            </div>
+            <div style={{ marginBottom: '0.5rem' }}>
+              <textarea
+                placeholder="또는 텍스트를 입력하세요"
+                rows="5"
+                style={{ width: '100%' }}
+                value={text}
+                onChange={e => setText(e.target.value)}
+              />
+            </div>
+            <button type="submit">Submit</button>
+          </form>
+        </>
+      ) : (
+        <form onSubmit={login} style={{ marginBottom: '1rem' }}>
+          <div>
+            <input
+              type="email"
+              placeholder="Email"
+              value={email}
+              onChange={e => setEmail(e.target.value)}
+            />
+          </div>
+          <div>
+            <input
+              type="password"
+              placeholder="Password"
+              value={password}
+              onChange={e => setPassword(e.target.value)}
+            />
+          </div>
+          <button type="submit">Login</button>{' '}
+          <button type="button" onClick={signup}>Sign Up</button>
+        </form>
+      )}
       {loading && <p>Processing...</p>}
       {error && <p style={{ color: 'red' }}>{error}</p>}
       {tree && (
