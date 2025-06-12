@@ -35,6 +35,7 @@ function App() {
   const [tree, setTree] = useState(null);
   const [mapId, setMapId] = useState('');
   const [maps, setMaps] = useState([]);
+  const [usage, setUsage] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [email, setEmail] = useState('');
@@ -79,8 +80,44 @@ function App() {
     }
   };
 
+  const loadUsage = async () => {
+    const token = await auth.currentUser?.getIdToken?.();
+    const headers = token ? { Authorization: `Bearer ${token}` } : {};
+    const res = await fetch('/api/usage', { headers });
+    if (res.ok) {
+      const data = await res.json();
+      setUsage(data);
+    }
+  };
+
+  const loadMapById = async id => {
+    const token = await auth.currentUser?.getIdToken?.();
+    const headers = token ? { Authorization: `Bearer ${token}` } : {};
+    const res = await fetch(`/api/maps/${id}`, { headers });
+    if (res.ok) {
+      const data = await res.json();
+      setMapId(id);
+      setTree(data.tree);
+    }
+  };
+
+  const deleteMapById = async id => {
+    if (!confirm('Delete this map?')) return;
+    const token = await auth.currentUser?.getIdToken?.();
+    const headers = token ? { Authorization: `Bearer ${token}` } : {};
+    const res = await fetch(`/api/maps/${id}`, { method: 'DELETE', headers });
+    if (res.ok) {
+      setMaps(maps.filter(m => m.id !== id));
+      if (mapId === id) {
+        setMapId('');
+        setTree(null);
+      }
+    }
+  };
+
   useEffect(() => {
     loadMaps();
+    loadUsage();
   }, []);
 
   const handleSubmit = async (e) => {
@@ -111,6 +148,7 @@ function App() {
       setTree(data.tree);
       setMapId(data.id);
       await loadMaps();
+      await loadUsage();
     } catch (err) {
       setError(err.message);
     } finally {
@@ -132,6 +170,7 @@ function App() {
     if (res.ok) {
       const data = await res.json();
       setTree({ ...data });
+      await loadUsage();
     }
   };
 
@@ -212,6 +251,9 @@ function App() {
           <button type="button" onClick={signup}>Sign Up</button>
         </form>
       )}
+      {usage && (
+        <p>Daily usage: {usage.count} / {usage.quota}</p>
+      )}
       {loading && <p>Processing...</p>}
       {error && <p style={{ color: 'red' }}>{error}</p>}
       {tree && (
@@ -236,7 +278,11 @@ function App() {
           <h2>Saved Maps</h2>
           <ul>
             {maps.map(m => (
-              <li key={m.id}>{m.id}</li>
+              <li key={m.id}>
+                <button onClick={() => loadMapById(m.id)}>Load</button>{' '}
+                {m.id}{' '}
+                <button onClick={() => deleteMapById(m.id)}>Delete</button>
+              </li>
             ))}
           </ul>
         </div>

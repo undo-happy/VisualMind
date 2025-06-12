@@ -11,6 +11,9 @@ import rateLimit from 'express-rate-limit';
 import NodeCache from 'node-cache';
 import morgan from 'morgan';
 import crypto from 'crypto';
+import clamav from 'clamav.js';
+
+const ADMIN_UIDS = process.env.ADMIN_UIDS ? process.env.ADMIN_UIDS.split(',') : [];
 
 const app = express();
 app.use(express.json());
@@ -22,6 +25,8 @@ const upload = multer({ dest: 'uploads/' });
 const PORT = process.env.PORT || 3001;
 const UPSTAGE_API_KEY = process.env.UPSTAGE_API_KEY;
 const FIREBASE_SERVICE_ACCOUNT = process.env.FIREBASE_SERVICE_ACCOUNT;
+const CLAMAV_HOST = process.env.CLAMAV_HOST;
+const CLAMAV_PORT = parseInt(process.env.CLAMAV_PORT || '3310', 10);
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 // SQLite database initialization
 const db = new Database(path.join(__dirname, 'visualmind.db'));
@@ -41,7 +46,12 @@ db.exec(`CREATE TABLE IF NOT EXISTS usage_quota (
 const insertMapStmt = db.prepare('INSERT INTO maps (id, userId, tree, text, formatted) VALUES (?, ?, ?, ?, ?)');
 const selectMapsStmt = db.prepare('SELECT id FROM maps WHERE userId = ?');
 const selectMapStmt = db.prepare('SELECT * FROM maps WHERE id = ? AND userId = ?');
+const selectMapByIdStmt = db.prepare('SELECT * FROM maps WHERE id = ?');
+const selectAllMapsStmt = db.prepare('SELECT id, userId FROM maps');
 const updateMapStmt = db.prepare('UPDATE maps SET tree = ?, text = ?, formatted = ? WHERE id = ? AND userId = ?');
+const updateMapAdminStmt = db.prepare('UPDATE maps SET tree = ?, text = ?, formatted = ? WHERE id = ?');
+const deleteMapStmt = db.prepare('DELETE FROM maps WHERE id = ? AND userId = ?');
+const deleteMapAdminStmt = db.prepare('DELETE FROM maps WHERE id = ?');
 const getQuotaStmt = db.prepare('SELECT count FROM usage_quota WHERE userId = ? AND date = ?');
 const upsertQuotaStmt = db.prepare(`INSERT INTO usage_quota (userId, date, count) VALUES (?, ?, 1)
   ON CONFLICT(userId, date) DO UPDATE SET count = count + 1`);
@@ -50,8 +60,20 @@ function sha1(data) {
   return crypto.createHash('sha1').update(data).digest('hex');
 }
 
-function getMapFromDB(id, userId) {
-  const row = selectMapStmt.get(id, userId);
+function isAdmin(user) {
+  if (!user) return false;
+  return ADMIN_UIDS.includes(user.uid);
+}
+
+function requireAdmin(req, res, next) {
+  if (!isAdmin(req.user)) {
+    return res.status(403).json({ error: 'Forbidden' });
+  }
+  next();
+}
+
+function getMapFromDB(id, userId, admin = false) {
+  const row = admin ? selectMapByIdStmt.get(id) : selectMapStmt.get(id, userId);
   if (!row) return null;
   return { ...row, tree: JSON.parse(row.tree) };
 }
@@ -217,9 +239,21 @@ async function buildMindMap(text) {
   return data;
 }
 
+async function scanFile(filePath) {
+  if (!CLAMAV_HOST) return;
+  await new Promise((resolve, reject) => {
+    clamav.createScanner(CLAMAV_PORT, CLAMAV_HOST).scan(filePath, (err, _file, isInfected) => {
+      if (err) return reject(err);
+      if (isInfected) return reject(new Error('Virus detected'));
+      resolve();
+    });
+  });
+}
+
 app.post('/api/upload', upload.single('file'), checkQuota, async (req, res) => {
   const { file } = req;
   try {
+    await scanFile(file.path);
     const text = await parseDocument(file.path, file.mimetype);
     const formatted = await structuredOutput(text);
     const tree = await buildMindMap(formatted);
@@ -261,33 +295,59 @@ app.get('/api/maps', (req, res) => {
   res.json(rows);
 });
 
+app.get('/api/admin/maps', requireAdmin, (req, res) => {
+  const rows = selectAllMapsStmt.all();
+  res.json(rows);
+});
+
 // 특정 ID의 마인드맵 조회
 app.get('/api/maps/:id', (req, res) => {
   const userId = req.user ? req.user.uid : 'anonymous';
-  const map = getMapFromDB(req.params.id, userId);
+  const admin = isAdmin(req.user);
+  const map = getMapFromDB(req.params.id, userId, admin);
   if (!map) {
     return res.status(404).json({ error: 'Not found' });
   }
   res.json(map);
 });
 
+// 전체 마인드맵 삭제
+app.delete('/api/maps/:id', (req, res) => {
+  const userId = req.user ? req.user.uid : 'anonymous';
+  const admin = isAdmin(req.user);
+  const map = getMapFromDB(req.params.id, userId, admin);
+  if (!map) return res.status(404).json({ error: 'Not found' });
+  if (admin) {
+    deleteMapAdminStmt.run(req.params.id);
+  } else {
+    deleteMapStmt.run(req.params.id, userId);
+  }
+  res.json({ success: true });
+});
+
 // 노드 삭제
 app.post('/api/maps/:id/remove', (req, res) => {
   const userId = req.user ? req.user.uid : 'anonymous';
-  const map = getMapFromDB(req.params.id, userId);
+  const admin = isAdmin(req.user);
+  const map = getMapFromDB(req.params.id, userId, admin);
   if (!map) return res.status(404).json({ error: 'Not found' });
   const { path } = req.body;
   if (!Array.isArray(path)) return res.status(400).json({ error: 'Invalid path' });
   const ok = removeNodeByPath(map.tree, path);
   if (!ok) return res.status(400).json({ error: 'Remove failed' });
-  updateMapStmt.run(JSON.stringify(map.tree), map.text, map.formatted, map.id, userId);
+  if (admin) {
+    updateMapAdminStmt.run(JSON.stringify(map.tree), map.text, map.formatted, map.id);
+  } else {
+    updateMapStmt.run(JSON.stringify(map.tree), map.text, map.formatted, map.id, userId);
+  }
   res.json(map.tree);
 });
 
 // 자식 노드 추가
 app.post('/api/maps/:id/add', (req, res) => {
   const userId = req.user ? req.user.uid : 'anonymous';
-  const map = getMapFromDB(req.params.id, userId);
+  const admin = isAdmin(req.user);
+  const map = getMapFromDB(req.params.id, userId, admin);
   if (!map) return res.status(404).json({ error: 'Not found' });
   const { path, title } = req.body;
   if (!Array.isArray(path) || typeof title !== 'string') {
@@ -296,14 +356,19 @@ app.post('/api/maps/:id/add', (req, res) => {
   const child = { title };
   const ok = addChildByPath(map.tree, path, child);
   if (!ok) return res.status(400).json({ error: 'Add failed' });
-  updateMapStmt.run(JSON.stringify(map.tree), map.text, map.formatted, map.id, userId);
+  if (admin) {
+    updateMapAdminStmt.run(JSON.stringify(map.tree), map.text, map.formatted, map.id);
+  } else {
+    updateMapStmt.run(JSON.stringify(map.tree), map.text, map.formatted, map.id, userId);
+  }
   res.json(map.tree);
 });
 
 // LLM 기반 확장
 app.post('/api/maps/:id/expand', checkQuota, async (req, res) => {
   const userId = req.user ? req.user.uid : 'anonymous';
-  const map = getMapFromDB(req.params.id, userId);
+  const admin = isAdmin(req.user);
+  const map = getMapFromDB(req.params.id, userId, admin);
   if (!map) return res.status(404).json({ error: 'Not found' });
   const { path } = req.body;
   if (!Array.isArray(path)) return res.status(400).json({ error: 'Invalid path' });
@@ -313,12 +378,26 @@ app.post('/api/maps/:id/expand', checkQuota, async (req, res) => {
     const prompt = `${map.formatted}\n\n위 내용 중 '${node.title || node.name || node.key}' 항목을 더 세부적인 마인드맵으로 확장해줘.`;
     const newTree = await buildMindMap(prompt);
     node.children = newTree.children || [];
-    updateMapStmt.run(JSON.stringify(map.tree), map.text, map.formatted, map.id, userId);
+    if (admin) {
+      updateMapAdminStmt.run(JSON.stringify(map.tree), map.text, map.formatted, map.id);
+    } else {
+      updateMapStmt.run(JSON.stringify(map.tree), map.text, map.formatted, map.id, userId);
+    }
     res.json(map.tree);
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: err.message });
   }
+});
+
+app.get('/api/usage', (req, res) => {
+  if (!req.user) {
+    return res.json({ count: 0, quota: DAILY_QUOTA });
+  }
+  const date = new Date().toISOString().slice(0, 10);
+  const row = getQuotaStmt.get(req.user.uid, date);
+  const count = row ? row.count : 0;
+  res.json({ count, quota: DAILY_QUOTA });
 });
 
 app.get('/api/health', (req, res) => {
