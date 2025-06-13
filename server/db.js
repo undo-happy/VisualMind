@@ -31,6 +31,15 @@ export function init() {
     due TEXT,
     UNIQUE(mapId, userId, path)
   )`);
+  db.exec(`CREATE TABLE IF NOT EXISTS review_jobs (
+    id TEXT PRIMARY KEY,
+    userId TEXT,
+    mapId TEXT,
+    path TEXT,
+    rating INTEGER,
+    status TEXT,
+    due TEXT
+  )`);
 }
 
 init();
@@ -57,5 +66,7 @@ export const insertCardStmt = db.prepare(`
 `);
 export const updateCardStmt = db.prepare('UPDATE fsrs SET stability = ?, difficulty = ?, due = ? WHERE id = ?');
 export const deleteCardsByMapStmt = db.prepare('DELETE FROM fsrs WHERE mapId = ? AND userId = ?');
+export const insertReviewJobStmt = db.prepare('INSERT INTO review_jobs (id, userId, mapId, path, rating, status) VALUES (?, ?, ?, ?, ?, ?);');
+export const updateReviewJobStmt = db.prepare('UPDATE review_jobs SET status = ?, due = ? WHERE id = ?');
 
 export default db;
