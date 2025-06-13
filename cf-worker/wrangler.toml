@@ -11,4 +11,4 @@ binding = "DB"
 database_name = "vmind"
 
 [vars]
-UPSTAGE_KEY = "sk-..."
+UPSTAGE_API_KEY = "sk-..."
