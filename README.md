@@ -100,3 +100,16 @@ cd ../client && npm run build
 - `POST /api/rum`: 브라우저 Web Vitals 지표를 수집합니다.
 - `GET /api/review`: 오늘 복습이 필요한 노드 목록을 반환합니다.
 - `POST /api/review`: 노드 복습 결과를 기록하여 다음 복습 날짜를 계산합니다.
+
+## Cloudflare Worker Deployment
+
+`cf-worker` 디렉터리에는 [Hono](https://hono.dev) 기반의 간단한 Cloudflare Worker 예제가 포함되어 있습니다.
+업로드 파일을 R2 버킷에 저장하고, 마인드맵 JSON은 D1 데이터베이스에 보관합니다.
+
+```
+cd cf-worker
+npm install
+npm run deploy
+```
+
+`wrangler.toml`에서 버킷과 데이터베이스 이름을 수정한 뒤 위 명령을 실행하면 Pages에서 정적 프런트를 제공하고 Worker가 API를 처리하는 구성을 손쉽게 배포할 수 있습니다.
