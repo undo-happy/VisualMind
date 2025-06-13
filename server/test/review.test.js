@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import db, { insertReviewJobStmt } from '../db.js';
+import { createReviewJobsTable } from '../src/db/review.schema';
 import { v4 as uuidv4 } from 'uuid';
 
 describe('review schema', () => {
@@ -10,5 +11,9 @@ describe('review schema', () => {
     expect(row.userId).toBe('u1');
     expect(row.status).toBe('queued');
     db.prepare('DELETE FROM review_jobs WHERE id = ?').run(id);
+  });
+
+  it('exports create table statement', () => {
+    expect(createReviewJobsTable).toContain('CREATE TABLE IF NOT EXISTS review_jobs');
   });
 });
