@@ -1,0 +1,14 @@
+name = "vmind-api"
+main = "src/worker.ts"
+compatibility_date = "2025-06-01"
+
+[[r2_buckets]]
+binding = "BUCKET"
+bucket_name = "vmind"
+
+[[d1_databases]]
+binding = "DB"
+database_name = "vmind"
+
+[vars]
+UPSTAGE_KEY = "sk-..."

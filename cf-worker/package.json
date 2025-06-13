@@ -1,0 +1,16 @@
+{
+  "name": "visualmind-cf-worker",
+  "version": "0.1.0",
+  "type": "module",
+  "devDependencies": {
+    "typescript": "^5.4.0"
+  },
+  "dependencies": {
+    "hono": "^4.0.0",
+    "uuid": "^9.0.0"
+  },
+  "scripts": {
+    "dev": "wrangler dev",
+    "deploy": "wrangler deploy"
+  }
+}
