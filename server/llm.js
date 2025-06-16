@@ -4,7 +4,9 @@ import path from 'path';
 import { sha256 } from './utils.js';
 import cache from './cache.js';
 import clamav from 'clamav.js';
-import { S3Client, PutObjectCommand } from '@aws-sdk/client-s3';
+import { S3Client, PutObjectCommand, GetObjectCommand } from '@aws-sdk/client-s3';
+import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
+import os from 'os';
 import { v4 as uuidv4 } from 'uuid';
 
 const UPSTAGE_API_KEY = process.env.UPSTAGE_API_KEY;
@@ -34,6 +36,38 @@ export async function uploadToS3(file) {
     ContentType: file.mimetype
   }));
   return key;
+}
+
+export async function generateUploadUrl(filename) {
+  if (!s3) throw new Error('S3 not configured');
+  const key = `${uuidv4()}-${filename}`;
+  const command = new PutObjectCommand({ Bucket: S3_BUCKET, Key: key });
+  const url = await getSignedUrl(s3, command, { expiresIn: 300 });
+  return { url, key };
+}
+
+async function downloadFromS3(key) {
+  if (!s3) throw new Error('S3 not configured');
+  const { Body } = await s3.send(new GetObjectCommand({ Bucket: S3_BUCKET, Key: key }));
+  const tmp = path.join(os.tmpdir(), `${uuidv4()}-${path.basename(key)}`);
+  await new Promise((resolve, reject) => {
+    const stream = fs.createWriteStream(tmp);
+    Body.pipe(stream).on('finish', resolve).on('error', reject);
+  });
+  return tmp;
+}
+
+export async function processFileFromS3(key, mime) {
+  const filePath = await downloadFromS3(key);
+  try {
+    await scanFile(filePath);
+    const text = await parseDocument(filePath, mime);
+    const formatted = await structuredOutput(text);
+    const tree = await buildMindMap(formatted);
+    return { text, formatted, tree };
+  } finally {
+    fs.unlink(filePath, () => {});
+  }
 }
 
 export async function scanFile(filePath) {

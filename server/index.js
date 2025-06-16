@@ -11,6 +11,10 @@ import Stripe from 'stripe';
 import pino from 'pino';
 import pinoHttp from 'pino-http';
 import client from 'prom-client';
+import cors from 'cors';
+import helmet from 'helmet';
+import dotenv from 'dotenv';
+dotenv.config();
 import { processQueue, queueEvents } from './queue.js';
 
 import {
@@ -37,6 +41,8 @@ import {
 import { deleteCardsByMapStmt } from './db.js';
 import {
   uploadToS3,
+  generateUploadUrl,
+  processFileFromS3,
   parseDocument,
   structuredOutput,
   buildMindMap,
@@ -68,6 +74,8 @@ const logger = pino({ level: process.env.LOG_LEVEL || 'info' });
 client.collectDefaultMetrics();
 
 const app = express();
+app.use(helmet());
+app.use(cors({ origin: process.env.CORS_ORIGIN || '*' }));
 app.post('/api/stripe/webhook', express.raw({ type: 'application/json' }), (req, res) => {
   if (!stripe || !STRIPE_WEBHOOK_SECRET) {
     return res.status(500).json({ error: 'Billing not configured' });
@@ -87,6 +95,38 @@ app.use(express.json());
 app.use(pinoHttp({ logger }));
 app.use('/api', limiter);
 app.use('/api', verifyAuth);
+
+app.post('/api/upload-url', async (req, res) => {
+  const { filename } = req.body;
+  if (typeof filename !== 'string' || !filename) {
+    return res.status(400).json({ error: 'filename required' });
+  }
+  try {
+    const data = await generateUploadUrl(filename);
+    res.json(data);
+  } catch (err) {
+    logger.error(err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.post('/api/process-upload', checkQuota, async (req, res) => {
+  const { key, mime } = req.body;
+  if (typeof key !== 'string' || typeof mime !== 'string') {
+    return res.status(400).json({ error: 'key and mime required' });
+  }
+  try {
+    const userId = req.user ? req.user.uid : 'anonymous';
+    const { text, formatted, tree } = await processFileFromS3(key, mime);
+    const id = uuidv4();
+    insertMapStmt.run(id, userId, JSON.stringify(tree), text, formatted);
+    addFsrsForTree(id, userId, tree);
+    res.json({ tree, id });
+  } catch (err) {
+    logger.error(err);
+    res.status(500).json({ error: err.message });
+  }
+});
 
 if (process.env.FIREBASE_SERVICE_ACCOUNT) {
   const serviceAccount = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT);

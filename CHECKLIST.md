@@ -21,7 +21,7 @@ These tasks are derived from the detailed technical proposal and will guide furt
  - [x] Incremental layout calculation and partial updates
 - [x] Lazy loading APIs and client-side data fetching
  - [x] Queue based OCR/LLM processing with BullMQ workers
-- [ ] Presigned URL uploads with file type and virus scanning
+- [x] Presigned URL uploads with file type and virus scanning
 - [x] Node.js clustering and horizontal scaling
 - [x] FSRS spaced repetition integration for nodes
 - [x] Responsive UI themes and smooth animations
