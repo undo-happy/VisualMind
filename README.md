@@ -41,6 +41,8 @@ API 키는 `UPSTAGE_API_KEY` 환경 변수로 주입하며, 실 서비스에서�
 `STRIPE_SECRET_KEY`, `STRIPE_PRICE_ID`, `STRIPE_WEBHOOK_SECRET`을 설정하면 구독 결제가 활성화됩니다.
 `CLUSTER` 값을 지정하면 해당 수만큼 Node.js 워커 프로세스를 띄워 여러 CPU 코어를 활용할 수 있습니다.
 `REDIS_URL`을 지정하면 BullMQ 작업 큐와 캐시 저장소로 Redis를 사용합니다.
+`CORS_ORIGIN`을 지정하면 해당 오리진에서의 API 요청만 허용하며, 비워 두면 모든 오리진을 허용합니다.
+환경 변수 예시는 `.env.example` 파일에 정리되어 있으니 복사해 원하는 값으로 수정하면 됩니다.
 
 ## 실행 방법
 
@@ -82,6 +84,8 @@ cd ../client && npm run build
 
 ## 추가 API
 - `POST /api/upload`: 파일을 업로드하여 마인드맵을 생성합니다. `file` 필드를 multipart 형식으로 전송합니다.
+- `POST /api/upload-url`: 클라이언트가 직접 S3에 업로드할 수 있도록 presigned URL을 반환합니다. `{ filename }`을 JSON으로 보냅니다.
+- `POST /api/process-upload`: presigned URL로 업로드된 S3 객체를 처리해 마인드맵을 생성합니다. `{ key, mime }`을 JSON으로 보냅니다.
 
 - `GET /api/health`: 서버 상태를 확인하는 헬스 체크 엔드포인트입니다. 로드 밸런서에서 주기적으로 호출해 프로세스 생존 여부를 점검할 수 있습니다.
 - `GET /api/usage`: 오늘 사용량과 할당량을 반환합니다.
